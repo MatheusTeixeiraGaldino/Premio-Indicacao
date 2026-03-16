@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prêmio por Indicação — Login</title>
+  <link rel="stylesheet" href="css/main.css">
+  <style>
+    .input-wrap { position: relative; }
+    .input-wrap .toggle-pw {
+      position: absolute; right: 10px; top: 50%;
+      transform: translateY(-50%);
+      background: none; border: none; color: var(--text-muted);
+      cursor: pointer; font-size: 14px; padding: 4px;
+    }
+    .divider { display: flex; align-items: center; gap: 10px; color: var(--text-dim); font-size: 12px; margin: 20px 0; }
+    .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border-light); }
+  </style>
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-box">
+      <div class="login-logo">
+        <div class="icon">🏆</div>
+        <h1>Prêmio por Indicação</h1>
+        <p>Sistema de Controle de Pagamentos</p>
+      </div>
+
+      <div id="alert-area"></div>
+
+      <div class="form-group">
+        <label class="form-label">E-mail</label>
+        <input type="email" id="email" class="form-control" placeholder="seu@email.com" autocomplete="email">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Senha</label>
+        <div class="input-wrap">
+          <input type="password" id="password" class="form-control" placeholder="••••••••" autocomplete="current-password">
+          <button class="toggle-pw" id="toggle-pw" type="button">👁</button>
+        </div>
+      </div>
+
+      <button class="btn btn-accent w-full btn-lg" id="login-btn" style="justify-content:center;margin-top:8px">
+        Entrar
+      </button>
+    </div>
+  </div>
+
+  <!-- Troca de senha (primeiro acesso) -->
+  <div class="modal-overlay" id="change-pw-overlay">
+    <div class="modal" style="max-width:420px">
+      <div class="modal-header">
+        <span class="modal-title">🔑 Primeiro Acesso — Defina sua senha</span>
+      </div>
+      <div class="modal-body">
+        <p class="text-sm text-muted mb-4">Por segurança, você precisa criar uma nova senha antes de continuar.</p>
+        <div id="pw-alert"></div>
+        <div class="form-group">
+          <label class="form-label">Nova Senha</label>
+          <input type="password" id="new-pw" class="form-control" placeholder="Mínimo 8 caracteres">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirmar Senha</label>
+          <input type="password" id="confirm-pw" class="form-control" placeholder="Repita a senha">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-accent" id="save-pw-btn">Salvar e Continuar</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { login, changePassword, getCurrentUser } from './js/auth.js';
+
+    // Redirect if already logged in
+    const existing = getCurrentUser();
+    if (existing) window.location.href = 'pages/dashboard.html';
+
+    const emailEl = document.getElementById('email');
+    const passEl = document.getElementById('password');
+    const loginBtn = document.getElementById('login-btn');
+    const alertArea = document.getElementById('alert-area');
+
+    function showAlert(msg, type = 'error') {
+      alertArea.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+    }
+
+    document.getElementById('toggle-pw').onclick = () => {
+      passEl.type = passEl.type === 'password' ? 'text' : 'password';
+    };
+
+    passEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') loginBtn.click(); });
+
+    loginBtn.addEventListener('click', async () => {
+      alertArea.innerHTML = '';
+      const email = emailEl.value.trim();
+      const pass = passEl.value;
+      if (!email || !pass) { showAlert('Preencha e-mail e senha.'); return; }
+
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Entrando...';
+
+      try {
+        const user = await login(email, pass);
+        if (user.senhaTemporaria) {
+          document.getElementById('change-pw-overlay').classList.add('open');
+        } else {
+          window.location.href = 'pages/dashboard.html';
+        }
+      } catch (e) {
+        showAlert(e.message || 'Erro ao fazer login. Verifique suas credenciais.');
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'Entrar';
+      }
+    });
+
+    document.getElementById('save-pw-btn').addEventListener('click', async () => {
+      const np = document.getElementById('new-pw').value;
+      const cp = document.getElementById('confirm-pw').value;
+      const pwAlert = document.getElementById('pw-alert');
+
+      if (np.length < 8) { pwAlert.innerHTML = '<div class="alert alert-error">Senha deve ter ao menos 8 caracteres.</div>'; return; }
+      if (np !== cp) { pwAlert.innerHTML = '<div class="alert alert-error">Senhas não conferem.</div>'; return; }
+
+      try {
+        await changePassword(np);
+        window.location.href = 'pages/dashboard.html';
+      } catch (e) {
+        pwAlert.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+      }
+    });
+  </script>
+</body>
+</html>
