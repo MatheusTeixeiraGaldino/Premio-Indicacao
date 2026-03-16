@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Usuários — Prêmio por Indicação</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar">
+      <div class="flex items-center gap-3">
+        <button class="hamburger" id="hamburger">☰</button>
+        <span class="topbar-title">Administração de Usuários</span>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-primary btn-sm" id="new-user-btn">+ Novo Usuário</button>
+      </div>
+    </header>
+    <main class="page-content">
+
+      <div id="alert-area"></div>
+
+      <div class="card" style="padding:0">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody id="tbody-users">
+              <tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-muted)">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- Modal Novo Usuário -->
+<div class="modal-overlay" id="new-user-overlay">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-header">
+      <span class="modal-title">➕ Novo Usuário</span>
+      <button class="modal-close" id="nu-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="nu-alert"></div>
+      <div class="form-group"><label class="form-label">Nome Completo *</label><input id="nu-nome" class="form-control" placeholder="Nome completo"></div>
+      <div class="form-group"><label class="form-label">E-mail *</label><input type="email" id="nu-email" class="form-control" placeholder="email@empresa.com"></div>
+      <div class="form-group"><label class="form-label">Perfil *</label>
+        <select id="nu-perfil" class="form-control">
+          <option value="">Selecione...</option>
+          <option value="admin">Administrador</option>
+          <option value="dh">DH — Desenvolvimento Humano</option>
+          <option value="dp">DP — Departamento Pessoal</option>
+        </select>
+      </div>
+      <div class="alert alert-info" style="margin-top:12px">
+        Uma senha temporária será gerada. O usuário deverá alterá-la no primeiro acesso.
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="nu-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="nu-save">Criar Usuário</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Senha Gerada -->
+<div class="modal-overlay" id="temp-pw-overlay">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header"><span class="modal-title">✅ Usuário Criado</span></div>
+    <div class="modal-body">
+      <p class="text-sm mb-4">Compartilhe as credenciais abaixo com o usuário:</p>
+      <div style="background:var(--bg-card2);border:1px solid var(--border);border-radius:8px;padding:16px;font-family:monospace;font-size:14px">
+        <div>E-mail: <strong id="show-email"></strong></div>
+        <div style="margin-top:8px">Senha: <strong id="show-pw" style="color:var(--warning)"></strong></div>
+      </div>
+      <div class="alert alert-warning mt-4">Anote esta senha — ela não será exibida novamente.</div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" id="temp-ok">Entendi</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { requireAuth, createUser, resetUserPassword } from '../js/auth.js';
+  import { renderSidebar, showToast, openModal, closeModal } from '../js/ui.js';
+  import { db } from '../js/firebase-config.js';
+  import { collection, getDocs, doc, updateDoc, orderBy, query } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+  const user = requireAuth(['admin']);
+  if (!user) throw new Error('Not auth');
+  renderSidebar('usuarios.html');
+
+  const PERFIL_LABELS = { admin: 'Administrador', dh: 'DH', dp: 'DP' };
+
+  async function loadUsers() {
+    const snap = await getDocs(query(collection(db, 'usuarios'), orderBy('criadoEm', 'desc')));
+    const users = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const tbody = document.getElementById('tbody-users');
+    tbody.innerHTML = users.map(u => `
+      <tr>
+        <td><strong>${u.nome}</strong>${u.senhaTemporaria ? ' <span class="badge badge-yellow">Temp. senha</span>' : ''}</td>
+        <td style="font-size:13px">${u.email}</td>
+        <td><span class="badge badge-blue">${PERFIL_LABELS[u.perfil] || u.perfil}</span></td>
+        <td>${u.status === 'ativo' ? '<span class="badge badge-green">Ativo</span>' : '<span class="badge badge-gray">Inativo</span>'}</td>
+        <td>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm reset-btn" data-id="${u.id}" data-email="${u.email}">Redefinir Senha</button>
+            <button class="btn btn-${u.status === 'ativo' ? 'danger' : 'success'} btn-sm toggle-btn" data-id="${u.id}" data-status="${u.status}">
+              ${u.status === 'ativo' ? 'Desativar' : 'Ativar'}
+            </button>
+          </div>
+        </td>
+      </tr>
+    `).join('') || '<tr><td colspan="5" style="text-align:center;padding:40px;color:var(--text-muted)">Nenhum usuário cadastrado.</td></tr>';
+
+    document.querySelectorAll('.reset-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm(`Redefinir senha do usuário ${btn.dataset.email}?`)) return;
+        try {
+          await resetUserPassword(btn.dataset.id, user.uid);
+          showToast('E-mail de redefinição enviado!', 'success');
+        } catch (e) { showToast(e.message, 'error'); }
+      });
+    });
+
+    document.querySelectorAll('.toggle-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const novoStatus = btn.dataset.status === 'ativo' ? 'inativo' : 'ativo';
+        try {
+          await updateDoc(doc(db, 'usuarios', btn.dataset.id), { status: novoStatus });
+          showToast(`Usuário ${novoStatus === 'ativo' ? 'ativado' : 'desativado'}.`, 'success');
+          loadUsers();
+        } catch (e) { showToast(e.message, 'error'); }
+      });
+    });
+  }
+
+  document.getElementById('new-user-btn').onclick = () => openModal('new-user-overlay');
+  document.getElementById('nu-close').onclick = () => closeModal('new-user-overlay');
+  document.getElementById('nu-cancel').onclick = () => closeModal('new-user-overlay');
+
+  document.getElementById('nu-save').addEventListener('click', async () => {
+    const nome = document.getElementById('nu-nome').value.trim();
+    const email = document.getElementById('nu-email').value.trim();
+    const perfil = document.getElementById('nu-perfil').value;
+    const alertEl = document.getElementById('nu-alert');
+    alertEl.innerHTML = '';
+
+    if (!nome || !email || !perfil) { alertEl.innerHTML = '<div class="alert alert-error">Preencha todos os campos.</div>'; return; }
+
+    const btn = document.getElementById('nu-save');
+    btn.disabled = true;
+    try {
+      const result = await createUser(email, nome, perfil, user.uid);
+      closeModal('new-user-overlay');
+      document.getElementById('show-email').textContent = email;
+      document.getElementById('show-pw').textContent = result.tempPassword;
+      openModal('temp-pw-overlay');
+      loadUsers();
+    } catch (e) {
+      alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    }
+    btn.disabled = false;
+  });
+
+  document.getElementById('temp-ok').onclick = () => closeModal('temp-pw-overlay');
+
+  loadUsers();
+</script>
+</body>
+</html>

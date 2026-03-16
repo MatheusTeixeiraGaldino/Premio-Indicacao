@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Prêmio por Indicação</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar">
+      <div class="flex items-center gap-3">
+        <button class="hamburger" id="hamburger">☰</button>
+        <span class="topbar-title">Dashboard</span>
+      </div>
+      <div class="topbar-actions">
+        <span id="last-update" style="font-size:12px;color:var(--text-muted)"></span>
+      </div>
+    </header>
+    <main class="page-content">
+
+      <!-- Stats -->
+      <div class="stats-grid" id="stats-grid">
+        <div class="stat-card blue"><div class="stat-label">Indicações Ativas</div><div class="stat-value" id="s-ativas">—</div><div class="stat-sub">Total em andamento</div></div>
+        <div class="stat-card yellow"><div class="stat-label">Previsão do Mês</div><div class="stat-value" id="s-prev-mes">—</div><div class="stat-sub" id="s-prev-val">—</div></div>
+        <div class="stat-card green"><div class="stat-label">Pago no Mês</div><div class="stat-value" id="s-pago-mes">—</div><div class="stat-sub" id="s-pago-val">—</div></div>
+        <div class="stat-card red"><div class="stat-label">Aguardando</div><div class="stat-value" id="s-aguardando">—</div><div class="stat-sub">Pagamentos pendentes</div></div>
+      </div>
+
+      <!-- Row 1 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px" class="charts-row">
+
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title">Indicações por Status</div></div>
+          </div>
+          <div class="chart-container">
+            <canvas id="chart-status"></canvas>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title">Pagamentos — Últimos 6 Meses</div></div>
+          </div>
+          <div class="chart-container">
+            <canvas id="chart-meses"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 2 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" class="charts-row">
+
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title">🏅 Ranking de Indicadores</div></div>
+          </div>
+          <ul class="ranking-list" id="ranking-list">
+            <li style="color:var(--text-muted);font-size:13px;padding:12px 0">Carregando...</li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title">Indicações por Setor</div></div>
+          </div>
+          <div class="chart-container" style="height:200px">
+            <canvas id="chart-setor"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script type="module">
+  import { requireAuth } from '../js/auth.js';
+  import { renderSidebar, formatCurrency, statusBadge } from '../js/ui.js';
+  import { listarIndicacoes, formatDate } from '../js/indicacoes.js';
+
+  const user = requireAuth();
+  if (!user) throw new Error('Not auth');
+
+  renderSidebar('dashboard.html');
+
+  document.getElementById('last-update').textContent = 'Atualizado: ' + new Date().toLocaleTimeString('pt-BR');
+
+  Chart.defaults.color = '#8b949e';
+  Chart.defaults.borderColor = '#21262d';
+  Chart.defaults.font.family = "'DM Sans', sans-serif";
+
+  async function loadDashboard() {
+    const lista = await listarIndicacoes();
+    const hoje = new Date();
+    const mesAtual = hoje.getMonth();
+    const anoAtual = hoje.getFullYear();
+
+    // Stats
+    const ativas = lista.filter(i => !['cancelado', 'colaborador_desligado'].includes(i.status));
+    document.getElementById('s-ativas').textContent = ativas.length;
+
+    const prevMes = lista.filter(i => {
+      if (i.status !== 'previsto' && i.status !== 'aguardando_pagamento') return false;
+      const prev = i.previsaoPagamento?.toDate();
+      return prev && prev.getMonth() === mesAtual && prev.getFullYear() === anoAtual;
+    });
+    document.getElementById('s-prev-mes').textContent = prevMes.length;
+    document.getElementById('s-prev-val').textContent = formatCurrency(prevMes.reduce((a, i) => a + i.valorPremio, 0));
+
+    const pagoMes = lista.filter(i => {
+      if (i.status !== 'pago') return false;
+      const dp = i.dataPagamento?.toDate();
+      return dp && dp.getMonth() === mesAtual && dp.getFullYear() === anoAtual;
+    });
+    document.getElementById('s-pago-mes').textContent = pagoMes.length;
+    document.getElementById('s-pago-val').textContent = formatCurrency(pagoMes.reduce((a, i) => a + i.valorPremio, 0));
+
+    const aguardando = lista.filter(i => i.status === 'aguardando_pagamento');
+    document.getElementById('s-aguardando').textContent = aguardando.length;
+
+    // Chart Status
+    const statusCount = {};
+    lista.forEach(i => { statusCount[i.status] = (statusCount[i.status] || 0) + 1; });
+    const statusColors = { previsto: '#1f6feb', aguardando_pagamento: '#d29922', pago: '#3fb950', colaborador_desligado: '#da3633', cancelado: '#484f58' };
+    const statusLabels = { previsto: 'Previsto', aguardando_pagamento: 'Aguardando', pago: 'Pago', colaborador_desligado: 'Desligado', cancelado: 'Cancelado' };
+
+    new Chart(document.getElementById('chart-status'), {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(statusCount).map(k => statusLabels[k] || k),
+        datasets: [{ data: Object.values(statusCount), backgroundColor: Object.keys(statusCount).map(k => statusColors[k] || '#8b949e'), borderWidth: 0, hoverOffset: 4 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 10, padding: 12, font: { size: 12 } } } }, cutout: '65%' }
+    });
+
+    // Chart Meses (últimos 6)
+    const meses = [];
+    const pagoPorMes = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(anoAtual, mesAtual - i, 1);
+      meses.push(d.toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }));
+      const pagos = lista.filter(ind => {
+        if (ind.status !== 'pago') return false;
+        const dp = ind.dataPagamento?.toDate();
+        return dp && dp.getMonth() === d.getMonth() && dp.getFullYear() === d.getFullYear();
+      });
+      pagoPorMes.push(pagos.reduce((a, i) => a + i.valorPremio, 0));
+    }
+
+    new Chart(document.getElementById('chart-meses'), {
+      type: 'bar',
+      data: {
+        labels: meses,
+        datasets: [{ label: 'Valor Pago', data: pagoPorMes, backgroundColor: 'rgba(31,111,235,0.5)', borderColor: '#1f6feb', borderWidth: 1, borderRadius: 4 }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: v => 'R$' + (v/1000).toFixed(0) + 'k' } } } }
+    });
+
+    // Ranking
+    const rankMap = {};
+    lista.forEach(i => {
+      if (!rankMap[i.matriculaIndicador]) rankMap[i.matriculaIndicador] = { nome: i.nomeIndicador, setor: i.setorIndicador, count: 0 };
+      rankMap[i.matriculaIndicador].count++;
+    });
+    const ranking = Object.values(rankMap).sort((a, b) => b.count - a.count).slice(0, 5);
+    const rankEl = document.getElementById('ranking-list');
+    if (ranking.length === 0) {
+      rankEl.innerHTML = '<li style="color:var(--text-muted);font-size:13px;padding:12px 0">Nenhuma indicação encontrada.</li>';
+    } else {
+      rankEl.innerHTML = ranking.map((r, idx) => `
+        <li class="ranking-item">
+          <span class="rank-pos ${idx < 3 ? 'top' : ''}">${idx + 1}</span>
+          <div class="rank-info">
+            <div class="rank-name">${r.nome}</div>
+            <div class="rank-sub">${r.setor}</div>
+          </div>
+          <span class="rank-count">${r.count}</span>
+        </li>
+      `).join('');
+    }
+
+    // Setor
+    const setorCount = {};
+    lista.forEach(i => { setorCount[i.setorIndicado] = (setorCount[i.setorIndicado] || 0) + 1; });
+    const setores = Object.entries(setorCount).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+    new Chart(document.getElementById('chart-setor'), {
+      type: 'bar',
+      data: {
+        labels: setores.map(s => s[0]),
+        datasets: [{ data: setores.map(s => s[1]), backgroundColor: 'rgba(63,185,80,0.5)', borderColor: '#3fb950', borderWidth: 1, borderRadius: 4 }]
+      },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { ticks: { stepSize: 1 } } } }
+    });
+  }
+
+  loadDashboard();
+</script>
+</body>
+</html>

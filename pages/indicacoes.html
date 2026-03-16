@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Indicações — Prêmio por Indicação</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar">
+      <div class="flex items-center gap-3">
+        <button class="hamburger" id="hamburger">☰</button>
+        <span class="topbar-title">Lista de Indicações</span>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn btn-ghost btn-sm" id="export-btn">⬇ Excel</button>
+        <a href="cadastro.html" class="btn btn-primary btn-sm" id="new-btn">+ Nova</a>
+      </div>
+    </header>
+    <main class="page-content">
+
+      <!-- Filters -->
+      <div class="card mb-4">
+        <div class="filter-bar" style="margin-bottom:0">
+          <div class="form-group" style="margin:0;flex:1;min-width:140px">
+            <select id="f-status" class="form-control">
+              <option value="todos">Todos os status</option>
+              <option value="previsto">Previsto</option>
+              <option value="aguardando_pagamento">Aguardando Pagamento</option>
+              <option value="pago">Pago</option>
+              <option value="colaborador_desligado">Colaborador Desligado</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0">
+            <input type="date" id="f-inicio" class="form-control" placeholder="Data início">
+          </div>
+          <div class="form-group" style="margin:0">
+            <input type="date" id="f-fim" class="form-control" placeholder="Data fim">
+          </div>
+          <input type="text" id="f-busca" class="form-control" placeholder="Buscar nome..." style="flex:1;min-width:140px">
+          <button class="btn btn-accent btn-sm" id="filter-btn">Filtrar</button>
+          <button class="btn btn-ghost btn-sm" id="clear-btn">Limpar</button>
+        </div>
+      </div>
+
+      <div class="card" style="padding:0">
+        <div class="table-wrap">
+          <table id="table-indicacoes">
+            <thead>
+              <tr>
+                <th>Indicado</th>
+                <th>Indicador</th>
+                <th>Setor</th>
+                <th>Admissão</th>
+                <th>Previsão</th>
+                <th>Valor</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody id="tbody">
+              <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- Modal Editar -->
+<div class="modal-overlay" id="edit-overlay">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <span class="modal-title">✏️ Editar Indicação</span>
+      <button class="modal-close" id="edit-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="edit-alert"></div>
+      <div class="form-section-title">Indicado</div>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Matrícula</label><input id="e-mat-indicado" class="form-control"></div>
+        <div class="form-group"><label class="form-label">Nome</label><input id="e-nome-indicado" class="form-control"></div>
+        <div class="form-group"><label class="form-label">Setor</label><input id="e-setor-indicado" class="form-control"></div>
+        <div class="form-group"><label class="form-label">Data de Admissão</label><input type="date" id="e-adm" class="form-control"></div>
+        <div class="form-group"><label class="form-label">Tipo de Contrato</label>
+          <select id="e-tipo" class="form-control">
+            <option value="experiencia">Experiência</option>
+            <option value="determinado">Prazo Determinado</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Término do Contrato</label><input type="date" id="e-termino" class="form-control"></div>
+      </div>
+      <div class="form-section-title">Indicador</div>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Matrícula</label><input id="e-mat-indicador" class="form-control"></div>
+        <div class="form-group"><label class="form-label">Nome</label><input id="e-nome-indicador" class="form-control"></div>
+        <div class="form-group"><label class="form-label">Setor</label><input id="e-setor-indicador" class="form-control"></div>
+      </div>
+      <div class="form-section-title">Pagamento</div>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Previsão de Pagamento</label><input type="date" id="e-previsao" class="form-control"></div>
+        <div class="form-group"><label class="form-label">Valor do Prêmio (R$)</label><input type="number" id="e-valor" class="form-control"></div>
+        <div class="form-group"><label class="form-label">Status</label>
+          <select id="e-status" class="form-control">
+            <option value="previsto">Previsto</option>
+            <option value="aguardando_pagamento">Aguardando Pagamento</option>
+            <option value="pago">Pago</option>
+            <option value="colaborador_desligado">Colaborador Desligado</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Data de Pagamento</label><input type="date" id="e-data-pag" class="form-control"></div>
+        <div class="form-group" id="e-grp-deslig"><label class="form-label">Data de Desligamento do Indicado</label><input type="date" id="e-deslig" class="form-control"></div>
+      </div>
+      <div class="form-group" id="e-grp-motivo" style="display:none">
+        <label class="form-label">Motivo do Cancelamento *</label>
+        <textarea id="e-motivo" class="form-control" rows="2" placeholder="Informe o motivo..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" id="edit-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="edit-save">Salvar Alterações</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  import { requireAuth } from '../js/auth.js';
+  import { renderSidebar, showToast, openModal, closeModal, formatCurrency, statusBadge } from '../js/ui.js';
+  import { listarIndicacoes, atualizarIndicacao, cancelarIndicacao, formatDate, toInputDate, STATUS_LABELS } from '../js/indicacoes.js';
+
+  const user = requireAuth();
+  if (!user) throw new Error('Not auth');
+  renderSidebar('indicacoes.html');
+
+  // Hide new btn for dp
+  if (user.perfil === 'dp') document.getElementById('new-btn').style.display = 'none';
+
+  let allData = [];
+  let editId = null;
+
+  async function load() {
+    const filtros = {
+      status: document.getElementById('f-status').value,
+      dataInicio: document.getElementById('f-inicio').value,
+      dataFim: document.getElementById('f-fim').value
+    };
+    allData = await listarIndicacoes(filtros);
+    render(allData);
+  }
+
+  function render(lista) {
+    const busca = document.getElementById('f-busca').value.toLowerCase();
+    const filtered = busca ? lista.filter(i => i.nomeIndicado.toLowerCase().includes(busca) || i.nomeIndicador.toLowerCase().includes(busca)) : lista;
+    const tbody = document.getElementById('tbody');
+    if (!filtered.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">Nenhuma indicação encontrada.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = filtered.map(i => `
+      <tr>
+        <td>
+          <div style="font-weight:500">${i.nomeIndicado}</div>
+          <div style="font-size:12px;color:var(--text-muted)">${i.matriculaIndicado}</div>
+        </td>
+        <td>
+          <div>${i.nomeIndicador}</div>
+          <div style="font-size:12px;color:var(--text-muted)">${i.matriculaIndicador}</div>
+        </td>
+        <td style="font-size:13px">${i.setorIndicado}</td>
+        <td style="font-size:13px">${formatDate(i.dataAdmissao)}</td>
+        <td style="font-size:13px">${formatDate(i.previsaoPagamento)}</td>
+        <td style="font-family:var(--font-display);font-weight:700">${formatCurrency(i.valorPremio)}</td>
+        <td>${statusBadge(i.status)}</td>
+        <td>
+          <div class="flex gap-2">
+            ${user.perfil !== 'dp' ? `<button class="btn btn-ghost btn-sm edit-btn" data-id="${i.id}">Editar</button>` : `<button class="btn btn-ghost btn-sm view-btn" data-id="${i.id}">Ver</button>`}
+          </div>
+        </td>
+      </tr>
+    `).join('');
+
+    document.querySelectorAll('.edit-btn, .view-btn').forEach(btn => {
+      btn.addEventListener('click', () => openEdit(btn.dataset.id, btn.classList.contains('view-btn')));
+    });
+  }
+
+  function openEdit(id, readOnly = false) {
+    const ind = allData.find(i => i.id === id);
+    if (!ind) return;
+    editId = id;
+
+    document.getElementById('e-mat-indicado').value = ind.matriculaIndicado || '';
+    document.getElementById('e-nome-indicado').value = ind.nomeIndicado || '';
+    document.getElementById('e-setor-indicado').value = ind.setorIndicado || '';
+    document.getElementById('e-adm').value = toInputDate(ind.dataAdmissao);
+    document.getElementById('e-tipo').value = ind.tipoContrato || 'experiencia';
+    document.getElementById('e-termino').value = toInputDate(ind.dataTerminoContrato);
+    document.getElementById('e-mat-indicador').value = ind.matriculaIndicador || '';
+    document.getElementById('e-nome-indicador').value = ind.nomeIndicador || '';
+    document.getElementById('e-setor-indicador').value = ind.setorIndicador || '';
+    document.getElementById('e-previsao').value = toInputDate(ind.previsaoPagamento);
+    document.getElementById('e-valor').value = ind.valorPremio || '';
+    document.getElementById('e-status').value = ind.status || 'previsto';
+    document.getElementById('e-data-pag').value = toInputDate(ind.dataPagamento);
+    document.getElementById('e-deslig').value = toInputDate(ind.dataDesligamentoIndicado);
+    document.getElementById('e-motivo').value = ind.motivoCancelamento || '';
+
+    const isCancelado = ind.status === 'cancelado';
+    document.getElementById('e-grp-motivo').style.display = isCancelado ? '' : 'none';
+
+    if (readOnly) {
+      document.querySelectorAll('#edit-overlay input, #edit-overlay select, #edit-overlay textarea').forEach(el => el.disabled = true);
+      document.getElementById('edit-save').style.display = 'none';
+    } else {
+      document.querySelectorAll('#edit-overlay input, #edit-overlay select, #edit-overlay textarea').forEach(el => el.disabled = false);
+      document.getElementById('edit-save').style.display = '';
+    }
+
+    openModal('edit-overlay');
+  }
+
+  document.getElementById('e-status').addEventListener('change', (e) => {
+    document.getElementById('e-grp-motivo').style.display = e.target.value === 'cancelado' ? '' : 'none';
+  });
+
+  document.getElementById('edit-close').onclick = () => closeModal('edit-overlay');
+  document.getElementById('edit-cancel').onclick = () => closeModal('edit-overlay');
+
+  document.getElementById('edit-save').addEventListener('click', async () => {
+    const alertEl = document.getElementById('edit-alert');
+    alertEl.innerHTML = '';
+    const status = document.getElementById('e-status').value;
+    const motivo = document.getElementById('e-motivo').value.trim();
+
+    if (status === 'cancelado' && !motivo) {
+      alertEl.innerHTML = '<div class="alert alert-error">Informe o motivo do cancelamento.</div>';
+      return;
+    }
+
+    const dados = {
+      matriculaIndicado: document.getElementById('e-mat-indicado').value.trim(),
+      nomeIndicado: document.getElementById('e-nome-indicado').value.trim(),
+      setorIndicado: document.getElementById('e-setor-indicado').value.trim(),
+      dataAdmissao: document.getElementById('e-adm').value,
+      tipoContrato: document.getElementById('e-tipo').value,
+      dataTerminoContrato: document.getElementById('e-termino').value || null,
+      matriculaIndicador: document.getElementById('e-mat-indicador').value.trim(),
+      nomeIndicador: document.getElementById('e-nome-indicador').value.trim(),
+      setorIndicador: document.getElementById('e-setor-indicador').value.trim(),
+      previsaoPagamento: null, // será calculado no service
+      valorPremio: parseFloat(document.getElementById('e-valor').value) || null,
+      status,
+      motivoCancelamento: status === 'cancelado' ? motivo : null,
+      dataPagamento: null
+    };
+
+    // Converte previsão se foi editada manualmente
+    const prevVal = document.getElementById('e-previsao').value;
+    if (prevVal) {
+      const { toTimestamp } = await import('../js/indicacoes.js');
+      dados.previsaoPagamento = toTimestamp(prevVal);
+    }
+
+    const dataPagVal = document.getElementById('e-data-pag').value;
+    if (dataPagVal) {
+      const { toTimestamp } = await import('../js/indicacoes.js');
+      dados.dataPagamento = toTimestamp(dataPagVal);
+    }
+
+    const desligVal = document.getElementById('e-deslig').value;
+    if (desligVal) {
+      const { toTimestamp } = await import('../js/indicacoes.js');
+      dados.dataDesligamentoIndicado = toTimestamp(desligVal);
+    }
+
+    try {
+      await atualizarIndicacao(editId, dados, user.uid, 'Edição via formulário.');
+      showToast('Indicação atualizada!', 'success');
+      closeModal('edit-overlay');
+      await load();
+    } catch (e) {
+      alertEl.innerHTML = `<div class="alert alert-error">${e.message}</div>`;
+    }
+  });
+
+  document.getElementById('filter-btn').addEventListener('click', load);
+  document.getElementById('clear-btn').addEventListener('click', () => {
+    document.getElementById('f-status').value = 'todos';
+    document.getElementById('f-inicio').value = '';
+    document.getElementById('f-fim').value = '';
+    document.getElementById('f-busca').value = '';
+    load();
+  });
+  document.getElementById('f-busca').addEventListener('input', () => render(allData));
+
+  // Export Excel
+  document.getElementById('export-btn').addEventListener('click', () => {
+    const rows = [['Indicador','Matrícula Indicador','Indicado','Matrícula Indicado','Data Admissão','Previsão Pagamento','Valor','Status','Data Pagamento']];
+    allData.forEach(i => {
+      rows.push([
+        i.nomeIndicador, i.matriculaIndicador,
+        i.nomeIndicado, i.matriculaIndicado,
+        formatDate(i.dataAdmissao),
+        formatDate(i.previsaoPagamento),
+        i.valorPremio,
+        STATUS_LABELS[i.status] || i.status,
+        formatDate(i.dataPagamento)
+      ]);
+    });
+    const csv = rows.map(r => r.map(c => `"${c || ''}"`).join(',')).join('\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `indicacoes_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+  });
+
+  load();
+</script>
+</body>
+</html>

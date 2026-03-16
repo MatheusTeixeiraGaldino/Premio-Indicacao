@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configurações — Prêmio por Indicação</title>
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-content">
+    <header class="topbar">
+      <div class="flex items-center gap-3">
+        <button class="hamburger" id="hamburger">☰</button>
+        <span class="topbar-title">Configurações</span>
+      </div>
+    </header>
+    <main class="page-content" style="max-width:600px">
+
+      <div id="alert-area"></div>
+
+      <div class="card">
+        <div class="form-section-title">⚙️ Configurações do Sistema</div>
+        <div class="form-group">
+          <label class="form-label">Valor Padrão do Prêmio (R$)</label>
+          <input type="number" id="valor-padrao" class="form-control" placeholder="Ex: 500" min="0" step="0.01">
+          <div class="text-sm text-muted mt-1">Este valor é usado automaticamente ao criar novas indicações.</div>
+        </div>
+        <div class="flex gap-2 mt-4" style="justify-content:flex-end">
+          <button class="btn btn-primary" id="save-cfg">Salvar Configurações</button>
+        </div>
+      </div>
+
+      <div class="card mt-4">
+        <div class="form-section-title">🔑 Minha Senha</div>
+        <div id="pw-alert"></div>
+        <div class="form-group"><label class="form-label">Senha Atual</label><input type="password" id="pw-atual" class="form-control"></div>
+        <div class="form-group"><label class="form-label">Nova Senha</label><input type="password" id="pw-nova" class="form-control" placeholder="Mínimo 8 caracteres"></div>
+        <div class="form-group"><label class="form-label">Confirmar Nova Senha</label><input type="password" id="pw-conf" class="form-control"></div>
+        <div class="flex gap-2 mt-4" style="justify-content:flex-end">
+          <button class="btn btn-accent" id="save-pw">Alterar Senha</button>
+        </div>
+      </div>
+
+      <div class="card mt-4">
+        <div class="form-section-title">📋 Histórico de Alterações</div>
+        <div id="audit-list">
+          <div style="color:var(--text-muted);font-size:13px;padding:12px 0">Carregando...</div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script type="module">
+  import { requireAuth, changePassword } from '../js/auth.js';
+  import { renderSidebar, showToast } from '../js/ui.js';
+  import { getConfig, saveConfig } from '../js/config.js';
+  import { getAuditLogs } from '../js/audit.js';
+
+  const user = requireAuth(['admin', 'dh']);
+  if (!user) throw new Error('Not auth');
+  renderSidebar('configuracoes.html');
+
+  // Load config
+  getConfig().then(cfg => {
+    document.getElementById('valor-padrao').value = cfg.valorPadrao || '';
+  });
+
+  document.getElementById('save-cfg').addEventListener('click', async () => {
+    const val = parseFloat(document.getElementById('valor-padrao').value);
+    if (!val || val <= 0) { document.getElementById('alert-area').innerHTML = '<div class="alert alert-error">Informe um valor válido.</div>'; return; }
+    try {
+      await saveConfig({ valorPadrao: val }, user.uid);
+      document.getElementById('alert-area').innerHTML = '<div class="alert alert-success">Configurações salvas!</div>';
+      setTimeout(() => document.getElementById('alert-area').innerHTML = '', 3000);
+    } catch (e) { document.getElementById('alert-area').innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+  });
+
+  document.getElementById('save-pw').addEventListener('click', async () => {
+    const nova = document.getElementById('pw-nova').value;
+    const conf = document.getElementById('pw-conf').value;
+    const pwAlert = document.getElementById('pw-alert');
+    pwAlert.innerHTML = '';
+    if (nova.length < 8) { pwAlert.innerHTML = '<div class="alert alert-error">Senha muito curta (mínimo 8 caracteres).</div>'; return; }
+    if (nova !== conf) { pwAlert.innerHTML = '<div class="alert alert-error">Senhas não conferem.</div>'; return; }
+    try {
+      await changePassword(nova);
+      pwAlert.innerHTML = '<div class="alert alert-success">Senha alterada com sucesso!</div>';
+      document.getElementById('pw-nova').value = '';
+      document.getElementById('pw-conf').value = '';
+      document.getElementById('pw-atual').value = '';
+    } catch (e) { pwAlert.innerHTML = `<div class="alert alert-error">${e.message}</div>`; }
+  });
+
+  // Audit
+  const acao_labels = {
+    criar_indicacao: 'Indicação criada',
+    atualizar_indicacao: 'Indicação atualizada',
+    cancelar_indicacao: 'Indicação cancelada',
+    registrar_pagamento: 'Pagamento registrado',
+    criar_usuario: 'Usuário criado',
+    reset_senha: 'Senha redefinida',
+    desligamento_indicado: 'Desligamento registrado',
+    logout: 'Logout'
+  };
+
+  getAuditLogs(null, 30).then(logs => {
+    const el = document.getElementById('audit-list');
+    if (!logs.length) { el.innerHTML = '<div style="color:var(--text-muted);font-size:13px">Nenhum registro encontrado.</div>'; return; }
+    el.innerHTML = logs.map(l => `
+      <div class="audit-item">
+        <div class="audit-dot"></div>
+        <div>
+          <div class="audit-desc">${acao_labels[l.acao] || l.acao}</div>
+          <div class="audit-meta">${l.descricao} · ${l.timestamp?.toDate().toLocaleString('pt-BR') || ''}</div>
+        </div>
+      </div>
+    `).join('');
+  });
+</script>
+</body>
+</html>
