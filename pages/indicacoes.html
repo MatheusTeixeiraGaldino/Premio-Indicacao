@@ -111,12 +111,12 @@
             <option value="previsto">Previsto</option>
             <option value="aguardando_pagamento">Aguardando Pagamento</option>
             <option value="pago">Pago</option>
-            <option value="colaborador_desligado">Colaborador Desligado</option>
+            <option value="colaborador_desligado">Desligado Antes do Prazo</option>
             <option value="cancelado">Cancelado</option>
           </select>
         </div>
         <div class="form-group"><label class="form-label">Data de Pagamento</label><input type="date" id="e-data-pag" class="form-control"></div>
-        <div class="form-group" id="e-grp-deslig"><label class="form-label">Data de Desligamento do Indicado</label><input type="date" id="e-deslig" class="form-control"></div>
+        <div class="form-group" id="e-grp-deslig" style="display:none"><label class="form-label">Data de Desligamento do Indicado</label><input type="date" id="e-deslig" class="form-control"></div>
       </div>
       <div class="form-group" id="e-grp-motivo" style="display:none">
         <label class="form-label">Motivo do Cancelamento *</label>
@@ -213,7 +213,9 @@
     document.getElementById('e-motivo').value = ind.motivoCancelamento || '';
 
     const isCancelado = ind.status === 'cancelado';
+    const isDesligado = ind.status === 'colaborador_desligado';
     document.getElementById('e-grp-motivo').style.display = isCancelado ? '' : 'none';
+    document.getElementById('e-grp-deslig').style.display = isDesligado ? '' : 'none';
 
     if (readOnly) {
       document.querySelectorAll('#edit-overlay input, #edit-overlay select, #edit-overlay textarea').forEach(el => el.disabled = true);
@@ -228,6 +230,7 @@
 
   document.getElementById('e-status').addEventListener('change', (e) => {
     document.getElementById('e-grp-motivo').style.display = e.target.value === 'cancelado' ? '' : 'none';
+    document.getElementById('e-grp-deslig').style.display = e.target.value === 'colaborador_desligado' ? '' : 'none';
   });
 
   document.getElementById('edit-close').onclick = () => closeModal('edit-overlay');
