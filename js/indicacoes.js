@@ -192,7 +192,7 @@ export const STATUS_LABELS = {
   previsto: 'Previsto',
   aguardando_pagamento: 'Aguardando Pagamento',
   pago: 'Pago',
-  colaborador_desligado: 'Colaborador Desligado',
+  colaborador_desligado: 'Desligado Antes do Prazo',
   cancelado: 'Cancelado'
 };
 
