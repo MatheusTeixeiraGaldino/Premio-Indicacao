@@ -133,7 +133,7 @@
 <script type="module">
   import { requireAuth } from '../js/auth.js';
   import { renderSidebar, showToast, openModal, closeModal, formatCurrency, statusBadge } from '../js/ui.js';
-  import { listarIndicacoes, atualizarIndicacao, cancelarIndicacao, formatDate, toInputDate, STATUS_LABELS } from '../js/indicacoes.js';
+  import { listarIndicacoes, atualizarIndicacao, cancelarIndicacao, excluirIndicacao, formatDate, toInputDate, STATUS_LABELS } from '../js/indicacoes.js';
 
   const user = requireAuth();
   if (!user) throw new Error('Not auth');
@@ -181,6 +181,7 @@
         <td>
           <div class="flex gap-2">
             ${user.perfil !== 'dp' ? `<button class="btn btn-ghost btn-sm edit-btn" data-id="${i.id}">Editar</button>` : `<button class="btn btn-ghost btn-sm view-btn" data-id="${i.id}">Ver</button>`}
+            ${user.perfil !== 'dp' ? `<button class="btn btn-ghost btn-sm delete-btn" data-id="${i.id}" style="color:var(--danger)">Excluir</button>` : ''}
           </div>
         </td>
       </tr>
@@ -188,6 +189,27 @@
 
     document.querySelectorAll('.edit-btn, .view-btn').forEach(btn => {
       btn.addEventListener('click', () => openEdit(btn.dataset.id, btn.classList.contains('view-btn')));
+    });
+
+    document.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.addEventListener('click', () => confirmarExcluir(btn.dataset.id));
+    });
+  }
+
+  async function confirmarExcluir(id) {
+    const ind = allData.find(i => i.id === id);
+    if (!ind) return;
+
+    import('../js/ui.js').then(({ createConfirmModal }) => {
+      createConfirmModal(`Deseja realmente excluir a indicação de <b>${ind.nomeIndicado}</b>?<br><br><small>Isso removerá permanentemente o registro e desmarcará o colaborador.</small>`, async () => {
+        try {
+          await excluirIndicacao(id, user.uid);
+          showToast('Indicação excluída com sucesso!', 'success');
+          load();
+        } catch (e) {
+          showToast(e.message, 'error');
+        }
+      });
     });
   }
 

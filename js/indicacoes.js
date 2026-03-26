@@ -120,6 +120,37 @@ export async function cancelarIndicacao(id, motivo, userId) {
   await addAuditLog('cancelar_indicacao', `Indicação cancelada. Motivo: ${motivo}`, userId, id);
 }
 
+export async function excluirIndicacao(id, userId) {
+  const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
+  const { matriculaToId } = await import('./colaboradores.js');
+  
+  const ref = doc(db, 'indicacoes', id);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error('Indicação não encontrada.');
+  
+  const dado = snap.data();
+  if (dado.status === 'pago') {
+    throw new Error('Não é possível excluir uma indicação que já foi paga.');
+  }
+
+  // Se houver matrícula do indicado, desmarcar no colaborador
+  if (dado.matriculaIndicado) {
+    const colabId = matriculaToId(dado.matriculaIndicado);
+    const colabRef = doc(db, 'colaboradores', colabId);
+    const colabSnap = await getDoc(colabRef);
+    if (colabSnap.exists() && colabSnap.data().indicacaoId === id) {
+      await updateDoc(colabRef, {
+        foiIndicado: false,
+        indicacaoId: null,
+        atualizadoEm: serverTimestamp()
+      });
+    }
+  }
+
+  await deleteDoc(ref);
+  await addAuditLog('excluir_indicacao', `Indicação excluída. Indicado: ${dado.nomeIndicado}`, userId, id);
+}
+
 export async function registrarDesligamento(id, dataDesligamento, userId) {
   const ref = doc(db, 'indicacoes', id);
   const snap = await getDoc(ref);

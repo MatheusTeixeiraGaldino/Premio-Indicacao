@@ -104,6 +104,36 @@ export async function marcarComoIndicado(colaboradorId, indicacaoId, userId) {
   await addAuditLog('marcar_indicado', `Colaborador marcado como indicado. Indicação: ${indicacaoId}`, userId, colaboradorId);
 }
 
+export async function desmarcarComoIndicado(colaboradorId, userId) {
+  const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
+  const ref = doc(db, 'colaboradores', colaboradorId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) throw new Error('Colaborador não encontrado.');
+  
+  const dado = snap.data();
+  const indicacaoId = dado.indicacaoId;
+
+  if (indicacaoId) {
+    const indRef = doc(db, 'indicacoes', indicacaoId);
+    const indSnap = await getDoc(indRef);
+    if (indSnap.exists()) {
+      const indDado = indSnap.data();
+      if (indDado.status === 'pago') {
+        throw new Error('Não é possível desmarcar uma indicação que já foi paga.');
+      }
+      await deleteDoc(indRef);
+    }
+  }
+
+  await updateDoc(ref, {
+    foiIndicado: false,
+    indicacaoId: null,
+    atualizadoEm: serverTimestamp()
+  });
+
+  await addAuditLog('desmarcar_indicado', `Indicação removida do colaborador. Indicação ID: ${indicacaoId}`, userId, colaboradorId);
+}
+
 export async function registrarDesligamentoColaborador(matricula, dataDesligamento, userId) {
   const docId = matriculaToId(matricula);
   const ref = doc(db, 'colaboradores', docId);
